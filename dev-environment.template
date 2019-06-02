@@ -1,0 +1,13 @@
+export SMTP_PORT=1025
+export MQTT_HOST=localhost
+export MQTT_PORT=1883
+export MQTT_USERNAME=""
+export MQTT_PASSWORD=""
+export MQTT_TOPIC=emqtt
+export MQTT_PAYLOAD=ON
+export MQTT_RESET_TIME=20
+export MQTT_RESET_PAYLOAD=OFF
+export SAVE_ATTACHMENTS=True
+export SAVE_ATTACHMENTS_DURING_RESET_TIME=False
+export SAVE_RAW_MESSAGES=False
+export DEBUG=True
