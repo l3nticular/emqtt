@@ -83,7 +83,7 @@ class EmailProcessor:
      - topic
      - payload
     """
-    def __init__(self):
+    def __init__(self, ):
       self._payload = "YES"
       self._topic = "no-topic"
     
@@ -97,6 +97,12 @@ class EmailProcessor:
     
     __metaclass__ = PluginMount
 
+class mqtt_packet:
+  def __init__(self):
+    self.topic = config['MQTT_TOPIC']
+    self.reset_time = config['MQTT_RESET_TIME']
+    self.payload = config['MQTT_PAYLOAD']
+
 class EMQTTHandler:
     def __init__(self, loop):
         self.loop = loop
@@ -108,38 +114,58 @@ class EMQTTHandler:
         if config['SAVE_ATTACHMENTS']:
             log.info('Configured to save attachments')
 
-    async def handle_DATA(self, server, session, envelope):
-        log.debug('Message from %s', envelope.mail_from)
-        msg = email.message_from_bytes(envelope.original_content, policy=default)
-        log.debug(
-            'Message data (truncated): %s',
-            envelope.content.decode('utf8', errors='replace')[:250]
+
+        
+    def get_mqtt_message( self, msg, config ):
+        
+        response = mqtt_packet()
+        
+        response.topic = '{}/{}'.format(
+          response.topic, 
+          msg['from'].replace('@', '')
         )
         
+        return response
         
+
+    async def handle_DATA(self, server, session, envelope):
+        log.debug('Message from %s', envelope.mail_from)
+        email_message = email.message_from_bytes(
+          envelope.original_content, 
+          policy=default
+        )
+        
+        log.debug(
+            'Message data (truncated): %s',
+            email_message.as_string()[:250]
+        )
+        
+        # If enabled this saves the message content as a string to disk
+        # this is only useful for debugging or recording messages to 
+        # be used in tests
         if config['SAVE_RAW_MESSAGES']:
-            msg_filename = msg['subject']
+            msg_filename = email_message['subject']
             log.debug( "Saving message content: %s", msg_filename )
             file_path = os.path.join('messages', msg_filename)
             with open(file_path, 'w+') as f:
-                f.write( msg.as_string() )
-                
-        topic = '{}/{}'.format(config['MQTT_TOPIC'], envelope.mail_from.replace('@', ''))
-        self.mqtt_publish(topic, config['MQTT_PAYLOAD'])
+                f.write( email_message.as_string() )
+        
+        mqtt_msg = self.get_mqtt_message( email_message, config )
+        self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
 
         # Save attached files if configured to do so.
         if config['SAVE_ATTACHMENTS'] and (
-                # Don't save them during reset time unless configured to do so.
-                topic not in self.handles
+                # Don't save them during rese time unless configured to do so.
+                mqtt_msg.topic not in self.handles
                 or config['SAVE_ATTACHMENTS_DURING_RESET_TIME']):
             log.debug(
                 'Saving attachments. Topic "%s" aldready triggered: %s, '
                 'Save attachment override: %s',
-                    topic,
-                    topic in self.handles,
+                    mqtt_msg.topic,
+                    mqtt_msg.topic in self.handles,
                     config['SAVE_ATTACHMENTS_DURING_RESET_TIME']
             )
-            for att in msg.iter_attachments():
+            for att in email_message.iter_attachments():
                 # Just save images
                 if not att.get_content_type().startswith('image'):
                     continue
@@ -153,16 +179,17 @@ class EMQTTHandler:
             log.debug('Not saving attachments')
             log.debug(self.handles)
 
+
         # Cancel any current scheduled resets of this topic
-        if topic in self.handles:
-            self.handles.pop(topic).cancel()
+        if mqtt_msg.topic in self.handles:
+            self.handles.pop(mqtt_msg.topic).cancel()
 
         if self.reset_time:
             # Schedule a reset of this topic
-            self.handles[topic] = self.loop.call_later(
+            self.handles[mqtt_msg.topic] = self.loop.call_later(
                 self.reset_time,
                 self.reset,
-                topic
+                mqtt_msg.topic
             )
         return '250 Message accepted for delivery'
 
