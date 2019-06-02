@@ -24,12 +24,14 @@ defaults = {
     'MQTT_RESET_PAYLOAD': 'OFF',
     'SAVE_ATTACHMENTS': 'True',
     'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
+    'SAVE_RAW_MESSAGES': 'False',
     'DEBUG': 'False'
 }
 config = {
     setting: os.environ.get(setting, default)
     for setting, default in defaults.items()
 }
+
 # Boolify
 for key, value in config.items():
     if value == 'True':
@@ -49,6 +51,52 @@ ch.setFormatter(formatter)
 log.addHandler(ch)
 
 
+####
+# Base class for user-defined plugins
+class PluginMount(type):
+    def __init__(cls, name, bases, attrs):
+        if not hasattr(cls, 'plugins'):
+            # This branch only executes when processing the mount point itself.
+            # So, since this is a new plugin type, not an implementation, this
+            # class shouldn't be registered as a plugin. Instead, it sets up a
+            # list where plugins can be registered later.
+            cls.plugins = []
+        else:
+            # This must be a plugin implementation, which should be
+            # registered. Simply appending it to the list is all that's
+            # needed to keep track of it later.
+            cls.plugins.append(cls)
+
+
+class EmailProcessor:
+    """
+    Super class for plugins that can process email messages to customize
+    the MQTT topic, payload, reset-time as well as take any actions on
+    attachments
+    
+    TODO: Figure out how to handle:
+      * reset time (-1 for no reset)
+      * Attachments
+      * how to hook into email addresses.
+    
+    Needs to expose the following properties:
+     - topic
+     - payload
+    """
+    def __init__(self):
+      self._payload = "YES"
+      self._topic = "no-topic"
+    
+    @property
+    def payload(self):
+      return self._payload
+  
+    @payload.setter
+    def payload( self, val ):
+      self._payload = val
+    
+    __metaclass__ = PluginMount
+
 class EMQTTHandler:
     def __init__(self, loop):
         self.loop = loop
@@ -67,6 +115,15 @@ class EMQTTHandler:
             'Message data (truncated): %s',
             envelope.content.decode('utf8', errors='replace')[:250]
         )
+        
+        
+        if config['SAVE_RAW_MESSAGES']:
+            msg_filename = msg['subject']
+            log.debug( "Saving message content: %s", msg_filename )
+            file_path = os.path.join('messages', msg_filename)
+            with open(file_path, 'w+') as f:
+                f.write( msg.as_string() )
+                
         topic = '{}/{}'.format(config['MQTT_TOPIC'], envelope.mail_from.replace('@', ''))
         self.mqtt_publish(topic, config['MQTT_PAYLOAD'])
 
@@ -116,7 +173,7 @@ class EMQTTHandler:
                 topic,
                 payload,
                 hostname=config['MQTT_HOST'],
-                port=config['MQTT_PORT'],
+                port= int( config['MQTT_PORT'] ),
                 auth={
                     'username': config['MQTT_USERNAME'],
                     'password': config['MQTT_PASSWORD']
