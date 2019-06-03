@@ -11,7 +11,11 @@ from email.policy import default
 from aiosmtpd.controller import Controller
 from paho.mqtt import publish
 
-
+class mqtt_packet:
+    def __init__(self):
+         self.topic = config['MQTT_TOPIC']
+         self.reset_time = config['MQTT_RESET_TIME']
+         self.payload = config['MQTT_PAYLOAD']
 
 ####
 # Base class for user-defined plugins
@@ -28,9 +32,12 @@ class PluginMount(type):
             # registered. Simply appending it to the list is all that's
             # needed to keep track of it later.
             cls.plugins.append(cls)
+            
+    def get_plugins(cls, *args, **kwargs):
+            return [p(*args, **kwargs) for p in cls.plugins]
 
 
-class EmailProcessor:
+class EmailProcessor(metaclass=PluginMount):
     """
     Super class for plugins that can process email messages to customize
     the MQTT topic, payload, reset-time as well as take any actions on
@@ -40,30 +47,37 @@ class EmailProcessor:
       * reset time (-1 for no reset)
       * Attachments
       * how to hook into email addresses.
-    
-    Needs to expose the following properties:
-     - topic
-     - payload
     """
-    def __init__(self, ):
-        self._payload = "YES"
-        self._topic = "no-topic"
     
-    @property
-    def payload(self):
-        return self._payload
-  
-    @payload.setter
-    def payload( self, val ):
-        self._payload = val
-    
-    __metaclass__ = PluginMount
+    def apply_to_sender( self, sender ):
+        return True
 
-class mqtt_packet:
-    def __init__(self):
-         self.topic = config['MQTT_TOPIC']
-         self.reset_time = config['MQTT_RESET_TIME']
-         self.payload = config['MQTT_PAYLOAD']
+    def mqtt_message( self, email_message ):
+        response = mqtt_packet()
+        response.topic = '{}/{}'.format(
+          response.topic, 
+          email_message['from'].replace('@', '')
+        )
+        return response
+        
+    def attachment_hook( self, email_message ):
+        return
+    
+#class DefaultEmailProcessor(EmailProcessor):
+#    pass
+
+class TestEmailProcessor(EmailProcessor):
+    def apply_to_sender( self, sender ):
+        log.debug( sender )
+        return sender == "AAA IPCamera <cam4_c2@l.filby.co>"
+
+    def mqtt_message( self, email_message ):
+        response = mqtt_packet()
+        response.topic = '{}/{}'.format(
+          response.topic, 
+          "test_topic"
+        )
+        return response
 
 class EMQTTHandler:
     def __init__(self, loop, config):
@@ -75,19 +89,14 @@ class EMQTTHandler:
         signal.signal(signal.SIGINT, self.set_quit)
         if config['SAVE_ATTACHMENTS']:
             log.info('Configured to save attachments')
-
-
-
+    
     # Generate the MQTT topic and payload from the incoming email 
     def get_mqtt_message( self, msg, config ):
-        
         response = mqtt_packet()
-        
         response.topic = '{}/{}'.format(
           response.topic, 
           msg['from'].replace('@', '')
         )
-        
         return response
         
 
@@ -113,7 +122,21 @@ class EMQTTHandler:
             with open(file_path, 'w+') as f:
                 f.write( email_message.as_string() )
         
-        mqtt_msg = self.get_mqtt_message( email_message, config )
+        # Check the dynamic plugins
+        actions = EmailProcessor.plugins
+        log.debug( "Loaded processor plugins: %s", actions )
+        mqtt_msg = None
+        for plugin in actions:
+            result = plugin().apply_to_sender( email_message['from'] )
+            log.debug( "%s -> %s", plugin, result )
+            if result is False:
+                continue
+                
+            mqtt_msg = plugin().mqtt_message( email_message )
+        
+        if mqtt_msg is None:
+            mqtt_msg = EmailProcessor().mqtt_message( email_message )
+            
         self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
 
         # Save attached files if configured to do so.
@@ -182,7 +205,6 @@ class EMQTTHandler:
         log.info('Quitting...')
         self.quit = True
 
-
 def get_application_config():
     defaults = {
         'SMTP_PORT': 1025,
@@ -224,8 +246,6 @@ def get_application_config():
 # Load the config globally for now
 config = get_application_config()
 
-#print('\n'.join([f'{k}={v}' for k, v in config.items()]))
-
 # Configure Logger
 log = logging.getLogger('emqtt')
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -247,7 +267,7 @@ if __name__ == '__main__':
         fh.setFormatter(formatter)
         log.addHandler(fh)
         
-    log.info('\n'.join([f'{k}={v}' for k, v in config.items()]))
+    log.info(', '.join([f'{k}={v}' for k, v in config.items()]))
 
     loop = asyncio.get_event_loop()
     c = Controller(
