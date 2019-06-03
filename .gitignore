@@ -1,2 +1,3 @@
 attachments/
 dev-environment
+**/__pycache__

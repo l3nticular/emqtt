@@ -12,44 +12,6 @@ from aiosmtpd.controller import Controller
 from paho.mqtt import publish
 
 
-defaults = {
-    'SMTP_PORT': 1025,
-    'MQTT_HOST': 'localhost',
-    'MQTT_PORT': 1883,
-    'MQTT_USERNAME': '',
-    'MQTT_PASSWORD': '',
-    'MQTT_TOPIC': 'emqtt',
-    'MQTT_PAYLOAD': 'ON',
-    'MQTT_RESET_TIME': '300',
-    'MQTT_RESET_PAYLOAD': 'OFF',
-    'SAVE_ATTACHMENTS': 'True',
-    'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
-    'SAVE_RAW_MESSAGES': 'False',
-    'DEBUG': 'False'
-}
-config = {
-    setting: os.environ.get(setting, default)
-    for setting, default in defaults.items()
-}
-
-# Boolify
-for key, value in config.items():
-    if value == 'True':
-        config[key] = True
-    elif value == 'False':
-        config[key] = False
-
-level = logging.DEBUG if config['DEBUG'] else logging.INFO
-
-log = logging.getLogger('emqtt')
-log.setLevel(level)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Log to console
-ch = logging.StreamHandler()
-ch.setFormatter(formatter)
-log.addHandler(ch)
-
 
 ####
 # Base class for user-defined plugins
@@ -84,29 +46,29 @@ class EmailProcessor:
      - payload
     """
     def __init__(self, ):
-      self._payload = "YES"
-      self._topic = "no-topic"
+        self._payload = "YES"
+        self._topic = "no-topic"
     
     @property
     def payload(self):
-      return self._payload
+        return self._payload
   
     @payload.setter
     def payload( self, val ):
-      self._payload = val
+        self._payload = val
     
     __metaclass__ = PluginMount
 
 class mqtt_packet:
-  def __init__(self):
-    self.topic = config['MQTT_TOPIC']
-    self.reset_time = config['MQTT_RESET_TIME']
-    self.payload = config['MQTT_PAYLOAD']
+    def __init__(self):
+         self.topic = config['MQTT_TOPIC']
+         self.reset_time = config['MQTT_RESET_TIME']
+         self.payload = config['MQTT_PAYLOAD']
 
 class EMQTTHandler:
-    def __init__(self, loop):
+    def __init__(self, loop, config):
         self.loop = loop
-        self.reset_time = int(config['MQTT_RESET_TIME'])
+        self.reset_time = config['MQTT_RESET_TIME']
         self.handles = {}
         self.quit = False
         signal.signal(signal.SIGTERM, self.set_quit)
@@ -115,7 +77,8 @@ class EMQTTHandler:
             log.info('Configured to save attachments')
 
 
-        
+
+    # Generate the MQTT topic and payload from the incoming email 
     def get_mqtt_message( self, msg, config ):
         
         response = mqtt_packet()
@@ -186,6 +149,7 @@ class EMQTTHandler:
 
         if self.reset_time:
             # Schedule a reset of this topic
+            log.debug( "Sheduling reset in %ds for %s", self.reset_time, mqtt_msg.topic )
             self.handles[mqtt_msg.topic] = self.loop.call_later(
                 self.reset_time,
                 self.reset,
@@ -200,7 +164,7 @@ class EMQTTHandler:
                 topic,
                 payload,
                 hostname=config['MQTT_HOST'],
-                port= int( config['MQTT_PORT'] ),
+                port= config['MQTT_PORT'],
                 auth={
                     'username': config['MQTT_USERNAME'],
                     'password': config['MQTT_PASSWORD']
@@ -219,8 +183,62 @@ class EMQTTHandler:
         self.quit = True
 
 
+def get_application_config():
+    defaults = {
+        'SMTP_PORT': 1025,
+        'SMTP_LISTEN_ADDRESS': '0.0.0.0',
+        'MQTT_HOST': 'localhost',
+        'MQTT_PORT': 1883,
+        'MQTT_USERNAME': '',
+        'MQTT_PASSWORD': '',
+        'MQTT_TOPIC': 'emqtt',
+        'MQTT_PAYLOAD': 'ON',
+        'MQTT_RESET_TIME': '20',
+        'MQTT_RESET_PAYLOAD': 'OFF',
+        'SAVE_ATTACHMENTS': 'True',
+        'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
+        'SAVE_RAW_MESSAGES': 'False',
+        'LOG': 'True',
+        'DEBUG': 'False'
+    }
+
+    config = {
+        setting: os.environ.get(setting, default)
+        for setting, default in defaults.items()
+    }
+
+    # Boolify
+    for key, value in config.items():
+        if value == 'True':
+            config[key] = True
+        elif value == 'False':
+            config[key] = False
+            
+    # Convert to ints where appropriate
+    int_configs = ['SMTP_PORT', 'MQTT_PORT', 'MQTT_RESET_TIME']
+    for key in int_configs:
+        config[key] = int(config[key])
+        
+    return config
+
+# Load the config globally for now
+config = get_application_config()
+
+#print('\n'.join([f'{k}={v}' for k, v in config.items()]))
+
+# Configure Logger
+log = logging.getLogger('emqtt')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+level = logging.DEBUG if config['DEBUG'] else logging.INFO
+log.setLevel(level)
+
+
 if __name__ == '__main__':
-    log.debug(', '.join([f'{k}={v}' for k, v in config.items()]))
+
+    # Log to console
+    ch = logging.StreamHandler()
+    ch.setFormatter(formatter)
+    log.addHandler(ch)
 
     # If there's a dir called log - set up a filehandler
     if os.path.exists('log'):
@@ -228,11 +246,21 @@ if __name__ == '__main__':
         fh = logging.FileHandler('log/emqtt.log')
         fh.setFormatter(formatter)
         log.addHandler(fh)
+        
+    log.info('\n'.join([f'{k}={v}' for k, v in config.items()]))
 
     loop = asyncio.get_event_loop()
-    c = Controller(EMQTTHandler(loop), loop, '0.0.0.0', config['SMTP_PORT'])
+    c = Controller(
+        EMQTTHandler(loop, config), 
+        loop, 
+        config['SMTP_LISTEN_ADDRESS'], 
+        config['SMTP_PORT']
+    )
+    
     c.start()
+    
     log.info('Running')
+    
     try:
         while not c.handler.quit:
             time.sleep(0.5)
