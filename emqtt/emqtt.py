@@ -8,6 +8,7 @@ from email.policy import default
 from paho.mqtt import publish
 
 from emqtt.plugins import EmailProcessor
+from emqtt.mqtt import mqtt_packet
 
 
 log = logging.getLogger('emqtt')
@@ -23,16 +24,7 @@ class EMQTTHandler:
         signal.signal(signal.SIGINT, self.set_quit)
         if self.config['SAVE_ATTACHMENTS']:
             log.info('Configured to save attachments')
-    
-    # Generate the MQTT topic and payload from the incoming email 
-    def get_mqtt_message( self, msg, config ):
-        response = mqtt_packet()
-        response.topic = '{}/{}'.format(
-          response.topic, 
-          msg['from'].replace('@', '')
-        )
-        return response
-        
+
 
     async def handle_DATA(self, server, session, envelope):
         log.debug('Message from %s', envelope.mail_from)
@@ -57,19 +49,16 @@ class EMQTTHandler:
                 f.write( email_message.as_string() )
         
         # Check the dynamic plugins
-        actions = EmailProcessor.plugins
+        actions = EmailProcessor.get_plugins()
         log.debug( "Loaded processor plugins: %s", actions )
         mqtt_msg = None
         for plugin in actions:
-            result = plugin().apply_to_sender( email_message['from'] )
+            result = plugin.apply_to_sender( email_message['from'] )
             log.debug( "%s -> %s", plugin, result )
             if result is False:
                 continue
                 
-            mqtt_msg = plugin().mqtt_message( email_message )
-        
-        if mqtt_msg is None:
-            mqtt_msg = EmailProcessor().mqtt_message( email_message )
+            mqtt_msg = plugin.mqtt_message( email_message )
             
         self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
 

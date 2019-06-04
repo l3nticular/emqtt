@@ -14,6 +14,7 @@ class PluginMount(type):
             # class shouldn't be registered as a plugin. Instead, it sets up a
             # list where plugins can be registered later.
             cls.plugins = []
+            cls.default = cls
         else:
             # This must be a plugin implementation, which should be
             # registered. Simply appending it to the list is all that's
@@ -21,7 +22,7 @@ class PluginMount(type):
             cls.plugins.append(cls)
             
     def get_plugins(cls, *args, **kwargs):
-            return [p(*args, **kwargs) for p in cls.plugins]
+            return [p(*args, **kwargs) for p in (cls.plugins + [cls.default])]
 
 
 class EmailProcessor(metaclass=PluginMount):

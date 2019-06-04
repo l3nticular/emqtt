@@ -11,15 +11,13 @@ from aiosmtpd.controller import Controller
 
 from emqtt import emqtt
 from emqtt import plugins
-from emqtt import config
-
-app_config = config.get_application_config()
+from emqtt.config import config
 
 
 # Configure Logger
 log = logging.getLogger('emqtt')
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-level = logging.DEBUG if app_config['DEBUG'] else logging.INFO
+level = logging.DEBUG if config['DEBUG'] else logging.INFO
 log.setLevel(level)
 
 
@@ -37,14 +35,14 @@ if __name__ == '__main__':
         fh.setFormatter(formatter)
         log.addHandler(fh)
         
-    log.info(', '.join([f'{k}={v}' for k, v in app_config.items()]))
+    log.info(', '.join([f'{k}={v}' for k, v in config.items()]))
 
     loop = asyncio.get_event_loop()
     c = Controller(
-        emqtt.EMQTTHandler(loop, app_config), 
+        emqtt.EMQTTHandler(loop, config), 
         loop, 
-        app_config['SMTP_LISTEN_ADDRESS'], 
-        app_config['SMTP_PORT']
+        config['SMTP_LISTEN_ADDRESS'], 
+        config['SMTP_PORT']
     )
     
     c.start()
