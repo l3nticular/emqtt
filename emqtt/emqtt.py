@@ -80,7 +80,7 @@ class EMQTTHandler:
                     continue
                 filename = att.get_filename()
                 image_data = att.get_content()
-                file_path = os.path.join('attachments', filename)
+                file_path = os.path.join(self.config['ATTACHMENTS_DIRECTORY'], filename)
                 log.info('Saving attached file %s to %s', filename, file_path)
                 with open(file_path, 'wb') as f:
                     f.write(image_data)

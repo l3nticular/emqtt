@@ -10,7 +10,6 @@ from email.policy import default
 from aiosmtpd.controller import Controller
 
 from emqtt import emqtt
-from emqtt import plugins
 from emqtt.config import config
 
 
@@ -35,7 +34,7 @@ if __name__ == '__main__':
         fh.setFormatter(formatter)
         log.addHandler(fh)
         
-    log.info(', '.join([f'{k}={v}' for k, v in config.items()]))
+    log.debug(', '.join([f'{k}={v}' for k, v in config.items()]))
 
     loop = asyncio.get_event_loop()
     c = Controller(

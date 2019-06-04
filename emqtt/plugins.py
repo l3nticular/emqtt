@@ -1,6 +1,8 @@
+import os
+import importlib
 import logging
 from emqtt.mqtt import mqtt_packet
-from emqtt import config
+from emqtt.config import config
 
 log = logging.getLogger('emqtt')
 
@@ -41,7 +43,7 @@ class EmailProcessor(metaclass=PluginMount):
         return True
 
     def mqtt_message( self, email_message ):
-        response = mqtt_packet( config.get_application_config() )
+        response = mqtt_packet( config )
         response.topic = '{}/{}'.format(
           response.topic, 
           email_message['from'].replace('@', '')
@@ -50,17 +52,13 @@ class EmailProcessor(metaclass=PluginMount):
         
     def attachment_hook( self, email_message ):
         return
+
+class PluginManager:
     
-
-class TestEmailProcessor(EmailProcessor):
-    def apply_to_sender( self, sender ):
-        log.debug( sender )
-        return sender == "AAA IPCamera <cam4_c2@l.filby.co>"
-
-    def mqtt_message( self, email_message ):
-        response = mqtt_packet()
-        response.topic = '{}/{}'.format(
-          response.topic, 
-          "test_topic"
-        )
-        return response
+    def load_plugins( self, path=config['PLUGIN_DIRECTORY'] ):
+        log.debug( "Plugin path: %s", path)
+        plugin_files = [f for f in os.listdir(path) if f.endswith('.py')]
+        for plugin_file in plugin_files:
+            plugin_path = os.path.join( path, plugin_file )
+            with open(plugin_path, 'r' ) as f:
+                exec( f.read() )

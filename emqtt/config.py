@@ -18,6 +18,8 @@ def get_application_config():
         'SAVE_ATTACHMENTS': 'True',
         'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
         'SAVE_RAW_MESSAGES': 'False',
+        'PLUGIN_DIRECTORY': 'plugins',
+        'ATTACHMENTS_DIRECTORY': 'attachments',
         'LOG': 'True',
         'DEBUG': 'False'
     }

@@ -7,6 +7,7 @@ from emqtt import emqtt
 from emqtt.mqtt import mqtt_packet
 from emqtt.config import config
 from emqtt.plugins import EmailProcessor
+from emqtt.plugins import PluginManager
 
 class EmailParsingTests(unittest.TestCase): 
 
@@ -38,3 +39,12 @@ class EmailParsingTests(unittest.TestCase):
 
     assert mqtt_msg.topic == "emqtt/IPCamera <cam4_c2local.domain.com>"
     assert mqtt_msg.payload == "ON"
+    
+    
+  def test_dynamic_loading(self):
+    """
+    Verify there are plugins loaded after loading them dynamically
+    """
+    PluginManager().load_plugins( path = "tests/test_email_plugins/" )
+    assert len(EmailProcessor.get_plugins()) > 1
+        
