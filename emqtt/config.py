@@ -13,7 +13,7 @@ def get_application_config():
         'MQTT_PASSWORD': '',
         'MQTT_TOPIC': 'emqtt',
         'MQTT_PAYLOAD': 'ON',
-        'MQTT_RESET_TIME': '20',
+        'MQTT_RESET_TIME': 20,
         'MQTT_RESET_PAYLOAD': 'OFF',
         'SAVE_ATTACHMENTS': 'True',
         'SAVE_ATTACHMENTS_DURING_RESET_TIME': 'False',
