@@ -13,7 +13,7 @@ class EmailParsingTests(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
     cls.plugins = EmailProcessor.get_plugins()
-    with open( "data/test_email_1", "rb" ) as f:
+    with open( "tests/data/test_email_1", "rb" ) as f:
       cls.msg_test_email_1 = email.message_from_binary_file(f, policy=default)    
 
   def test_load_default(self):

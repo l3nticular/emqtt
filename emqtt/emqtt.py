@@ -58,7 +58,7 @@ class EMQTTHandler:
             if result is False:
                 continue
                 
-            mqtt_msg = plugin.mqtt_message( email_message )
+            mqtt_msg = pluging.mqtt_message( email_message )
             
         self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
 
