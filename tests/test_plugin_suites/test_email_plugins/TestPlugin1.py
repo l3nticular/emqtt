@@ -1,3 +1,4 @@
+from emqtt.plugins import EmailProcessor
 class TestPlugin1(EmailProcessor):
     def apply_to_sender( self, sender ):
         log.debug( sender )

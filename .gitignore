@@ -1,3 +1,4 @@
 attachments/
 development.env
 **/__pycache__
+**.pyc

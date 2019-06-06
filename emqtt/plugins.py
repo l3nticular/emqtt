@@ -55,10 +55,34 @@ class EmailProcessor(metaclass=PluginMount):
 
 class PluginManager:
     
+    def _import_class(self, modulename, classname):
+        ''' Returns imported class. '''
+        try:
+            return getattr(__import__(modulename, globals(), locals(), [classname], 0), classname)
+        except AttributeError:
+            log.error( 'Error in importing class. "%s" has no class "%s"', modulename, classname )
+            return None
+        except ImportError as e:
+            log.error( 'Error in importing class: %s', e )
+            return None
+    
     def load_plugins( self, path=config['PLUGIN_DIRECTORY'] ):
         log.debug( "Plugin path: %s", path)
+        
+        plugin_module = path.replace( "/", "." )
+        log.debug( "Plugin module: %s", plugin_module )
+        
         plugin_files = [f for f in os.listdir(path) if f.endswith('.py')]
+        
         for plugin_file in plugin_files:
+            plugin_class = plugin_file[:-3]
             plugin_path = os.path.join( path, plugin_file )
-            with open(plugin_path, 'r' ) as f:
-                exec( f.read() )
+            log.debug( "Attempting to load '%s' from '%s'", plugin_class, plugin_module )
+            
+            # We don't need result other than to verify load, since just loading
+            # the class will register the plugin.
+            result = self._import_class( plugin_module, plugin_class)
+            
+            if result is None:
+                log.warn( "Failed to load '%s' from '%s'", plugin_class, plugin_module )
+
