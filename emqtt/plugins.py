@@ -4,6 +4,8 @@ import logging
 from emqtt.mqtt import mqtt_packet
 from emqtt.config import config
 
+import email.utils
+
 log = logging.getLogger('emqtt')
 
 ####
@@ -44,9 +46,16 @@ class EmailProcessor(metaclass=PluginMount):
 
     def mqtt_message( self, email_message ):
         response = mqtt_packet( config )
+        
+        # Try to pull only the email out of the email
+        # if that fails use what ever is in from.
+        name,address = email.utils.parseaddr( email_message['from'] )
+        if not address:
+            address = email_message['from']
+        
         response.topic = '{}/{}'.format(
           response.topic, 
-          email_message['from'].replace('@', '')
+          address.replace('@', '')
         )
         return response
         
@@ -74,6 +83,8 @@ class PluginManager:
         
         plugin_files = [f for f in os.listdir(path) if f.endswith('.py')]
         
+        # The Class in the file is assumed to be the same as the name of 
+        # the file with out the .py extension.
         for plugin_file in plugin_files:
             plugin_class = plugin_file[:-3]
             plugin_path = os.path.join( path, plugin_file )

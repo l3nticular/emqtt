@@ -4,6 +4,7 @@ import os
 import emqtt
 import email
 
+
 from email.policy import default
 from emqtt import emqtt
 from emqtt.mqtt import mqtt_packet
@@ -61,7 +62,7 @@ def test_mqtt_message_generation(plugins, datafiles):
 
         mqtt_msg = plugin.mqtt_message( email_msg )
 
-    assert mqtt_msg.topic == "emqtt/IPCamera <cam4_c2local.domain.com>"
+    assert mqtt_msg.topic == "emqtt/cam4_c2local.domain.com"
     assert mqtt_msg.payload == "ON"
   
   
