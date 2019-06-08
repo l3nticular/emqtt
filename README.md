@@ -12,7 +12,9 @@ I made a docker image because like any hipster dev I like docker. At least it's 
 
 Protip: `docker exec emqtt find attachments -type f -ctime +20 -delete`
 
-## Run it
+## Setup / Installation 
+
+###Run it
 
 1. Create venv and activate it. Or don't.
 
@@ -38,7 +40,7 @@ $ python emqtt.py
 2017-11-08 22:36:27,658 - root - INFO - Running
 ```
 
-## Run it in docker
+### Run it in docker
 
 ```
 $ docker build -t emqtt .
@@ -53,6 +55,32 @@ $ docker run -d \
     -v $PWD/log:/emqtt/log \
     -v $PWD/attachments:/emqtt/attachments \
     emqtt
+```
+
+## Plugins
+
+You can put customize the mqtt messages based on custom scripts. These scripts need to be placed in the configured `plugins/` direction and will be loaded when emqtt starts. Each file should contain a single class and the name of the class should match the filename (even if this isn't strictly enforced at this point).
+
+Example:
+
+```python
+import logging
+from emqtt.plugins import EmailProcessor
+
+log = logging.getLogger('test_email_plugins_TestPlugin1')
+
+class test_email_plugins_TestPlugin1(EmailProcessor):
+    def apply_to_sender( self, sender ):
+        log.debug( sender )
+        return sender == "AAA IPCamera <cam4_c2@l.filby.co>"
+
+    def mqtt_message( self, email_message ):
+        response = mqtt_packet()
+        response.topic = '{}/{}'.format(
+          response.topic, 
+          "test_topic"
+        )
+        return response
 ```
 
 ## Development
