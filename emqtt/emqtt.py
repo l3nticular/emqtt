@@ -8,6 +8,7 @@ from email.policy import default
 from paho.mqtt import publish
 
 from emqtt.plugins import EmailProcessor
+from emqtt.plugins import PluginManager
 from emqtt.mqtt import mqtt_packet
 
 
@@ -52,13 +53,9 @@ class EMQTTHandler:
         actions = EmailProcessor.get_plugins()
         log.debug( "Loaded processor plugins: %s", actions )
         mqtt_msg = None
-        for plugin in actions:
-            result = plugin.apply_to_sender( email_message['from'] )
-            log.debug( "%s -> %s", plugin, result )
-            if result is False:
-                continue
-                
-            mqtt_msg = plugin.mqtt_message( email_message )
+
+        plugin = PluginManager().get_plugin( email_message['from'] )
+        mqtt_msg = plugin.mqtt_message( email_message )
             
         self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
 

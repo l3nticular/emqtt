@@ -85,6 +85,7 @@ class PluginManager:
         log.debug( "Plugin module: %s", plugin_module )
         
         plugin_files = [f for f in os.listdir(path) if f.endswith('.py')]
+        plugin_files.sort()
 
         # The Class in the file is assumed to be the same as the name of 
         # the file with out the .py extension.
@@ -99,4 +100,11 @@ class PluginManager:
 
             if result is None:
                 log.warning( "Failed to load '%s' from '%s'", plugin_class, plugin_module )
+
+    # Given a sender
+    def get_plugin( self, sender ):
+        for plugin in EmailProcessor.get_plugins():
+            result = plugin.apply_to_sender( sender )
+            if result is True:
+                return plugin
 

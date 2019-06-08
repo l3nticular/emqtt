@@ -1,3 +1,6 @@
+run: 
+	python runner.py
+
 test:
 	python -m pytest -p no:warnings tests/
 

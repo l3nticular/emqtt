@@ -1,16 +1,18 @@
 import pytest
-
+import logging
 import os
 import emqtt
 import email
-
-
+from email.message import EmailMessage
 from email.policy import default
+
 from emqtt import emqtt
 from emqtt.mqtt import mqtt_packet
 from emqtt.config import config
 from emqtt.plugins import EmailProcessor
 from emqtt.plugins import PluginManager
+
+log = logging.getLogger('plugin_test')
 
 EMAIL_FIXTURE_DIR = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
@@ -34,8 +36,6 @@ def clean_plugins():
     EmailProcessor.plugins = []
   return None
 
-
-
 def test_load_default(plugins):
   """Load the plugins and ensure the last one is the default"""
   assert len( plugins ) >= 1
@@ -56,13 +56,8 @@ def test_mqtt_message_generation(plugins, datafiles):
       email_msg = email.message_from_binary_file(f, policy=default)
       
     mqtt_msg = None
-    for plugin in plugins:
-        result = plugin.apply_to_sender( email_msg['from'] )
-
-        if result is False:
-            continue
-
-        mqtt_msg = plugin.mqtt_message( email_msg )
+    plugin = PluginManager().get_plugin( email_msg['from'] )
+    mqtt_msg = plugin.mqtt_message( email_msg )
 
     assert mqtt_msg.topic == "emqtt/cam4_c2local.domain.com"
     assert mqtt_msg.payload == "ON"
@@ -81,15 +76,14 @@ def test_dynamic_loading( clean_plugins ):
   assert plugins[1].__class__.__name__ is 'EmailProcessor'  
 
 
-# At this point the plugin loader doesn't care if the classname 
-# matches, during import of the file it will register and getting
-# the specific class isn't important
-#
-# Maybe build in a safety check in the future that will prevent loading
-# a plugin if the classname doesn't match.
 def test_dynamic_loading_with_class_name_mismatch( clean_plugins ):
   """
-  Verify there are plugins loaded after loading them dynamically
+  At this point the plugin loader doesn't care if the classname 
+  matches, during import of the file it will register and getting
+  the specific class isn't important
+  
+  Maybe build in a safety check in the future that will prevent loading
+  a plugin if the classname doesn't match.
   """
 
   plugin_path = os.path.join( "tests", "test_plugin_suites", "filename_class_mismatch")
@@ -101,4 +95,39 @@ def test_dynamic_loading_with_class_name_mismatch( clean_plugins ):
   assert plugins[1].__class__.__name__ is 'EmailProcessor'
 
 
+
+def test_plugin_alpha_load_order( clean_plugins ):
+  """
+  Verify there are plugins loaded after loading them dynamically
+  
+  There are a collection of plugins that are alpha ordered
+  and each subsequent plugin can also match the plugins that 
+  would have come before (in theory it should never get there
+  because the earlier plugin would have caught it)
+  
+  Check order, then check the mqtt messages so they match the sender
+  """
+
+  plugin_path = os.path.join( "tests", "test_plugin_suites", "alpha_load_order")
+
+  PluginManager().load_plugins( path = plugin_path )
+  plugins = EmailProcessor.get_plugins()
+  assert len(plugins) == 6
+  assert plugins[0].__class__.__name__ is "alpha_load_order_A"
+  assert plugins[1].__class__.__name__ is "alpha_load_order_B"
+  assert plugins[2].__class__.__name__ is "alpha_load_order_C"
+  assert plugins[3].__class__.__name__ is "alpha_load_order_D"
+  assert plugins[4].__class__.__name__ is "alpha_load_order_E"
+  assert plugins[5].__class__.__name__ is 'EmailProcessor'
+  
+  test_addresses = ["A", "B", "C", "D", "E", "default"]    
+  
+  for test_address in test_addresses:
+    message = EmailMessage()
+    message['from'] = test_address
+    
+    plugin = PluginManager().get_plugin( test_address )
+    mqtt_message = plugin.mqtt_message( message )
+    
+    assert mqtt_message.topic == "emqtt/{0}".format( test_address )
       
