@@ -26,7 +26,10 @@ class PluginMount(type):
             cls.plugins.append(cls)
             
     def get_plugins(cls, *args, **kwargs):
-            return [p(*args, **kwargs) for p in (cls.plugins + [cls.default])]
+            if hasattr( cls, 'plugins'):
+                return [p(*args, **kwargs) for p in (cls.plugins + [cls.default])]
+            else:
+                return []
 
 
 class EmailProcessor(metaclass=PluginMount):
@@ -82,7 +85,7 @@ class PluginManager:
         log.debug( "Plugin module: %s", plugin_module )
         
         plugin_files = [f for f in os.listdir(path) if f.endswith('.py')]
-        
+
         # The Class in the file is assumed to be the same as the name of 
         # the file with out the .py extension.
         for plugin_file in plugin_files:
@@ -93,7 +96,7 @@ class PluginManager:
             # We don't need result other than to verify load, since just loading
             # the class will register the plugin.
             result = self._import_class( plugin_module, plugin_class)
-            
+
             if result is None:
-                log.warn( "Failed to load '%s' from '%s'", plugin_class, plugin_module )
+                log.warning( "Failed to load '%s' from '%s'", plugin_class, plugin_module )
 

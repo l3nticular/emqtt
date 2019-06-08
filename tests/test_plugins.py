@@ -22,15 +22,17 @@ PLUGINS_FIXTURE_DIR = os.path.join(
     'test_plugin_suites',
     )
 
-@pytest.fixture(autouse=True)
+@pytest.fixture()
 def plugins():
   return EmailProcessor.get_plugins()
-  
-# @pytest.fixture(autouse=True)
-# def msg_test_email_1(datadir):
-#   path = os.path.join( datadir, test_email_1)
-#   with open( path, "rb" ) as f:
-#     return email.message_from_binary_file(f, policy=default)
+
+# This fixture is an optional setup method
+# that will clean out the plugins already loaded.
+@pytest.fixture()
+def clean_plugins():
+  if hasattr( EmailProcessor, "plugins" ):
+    EmailProcessor.plugins = []
+  return None
 
 
 
@@ -66,11 +68,37 @@ def test_mqtt_message_generation(plugins, datafiles):
     assert mqtt_msg.payload == "ON"
   
   
-def test_dynamic_loading():
+def test_dynamic_loading( clean_plugins ):
   """
   Verify there are plugins loaded after loading them dynamically
   """
   plugin_path = os.path.join( "tests", "test_plugin_suites", "test_email_plugins")
   PluginManager().load_plugins( path = plugin_path )
-  assert len(EmailProcessor.get_plugins()) > 1
+  
+  plugins = EmailProcessor.get_plugins()
+  assert len(plugins) > 1
+  assert plugins[0].__class__.__name__ is 'test_email_plugins_TestPlugin1'
+  assert plugins[1].__class__.__name__ is 'EmailProcessor'  
+
+
+# At this point the plugin loader doesn't care if the classname 
+# matches, during import of the file it will register and getting
+# the specific class isn't important
+#
+# Maybe build in a safety check in the future that will prevent loading
+# a plugin if the classname doesn't match.
+def test_dynamic_loading_with_class_name_mismatch( clean_plugins ):
+  """
+  Verify there are plugins loaded after loading them dynamically
+  """
+
+  plugin_path = os.path.join( "tests", "test_plugin_suites", "filename_class_mismatch")
+
+  PluginManager().load_plugins( path = plugin_path )
+  plugins = EmailProcessor.get_plugins()
+  assert len(plugins) == 2
+  assert plugins[0].__class__.__name__ is "TestPlugin1_Obvious_Misname"
+  assert plugins[1].__class__.__name__ is 'EmailProcessor'
+
+
       

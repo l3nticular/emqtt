@@ -1,5 +1,5 @@
 test:
-	python -m pytest tests/
+	python -m pytest -p no:warnings tests/
 
 clean:
 	find . -name '*.pyc' -delete
@@ -10,7 +10,7 @@ docker:
 
 docker-test:
 	docker build -t emqtt:development .
-	docker run -it --rm emqtt:development python3 -m pytest tests/
+	docker run -it --rm emqtt:development python3 -m pytest -p no:warnings tests/
 	docker rmi emqtt:development
 
 	

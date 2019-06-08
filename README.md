@@ -55,3 +55,14 @@ $ docker run -d \
     emqtt
 ```
 
+## Development
+
+### Debugging Tests
+
+Insert `import pdb; pdb.set_trace()` into the code to drop into the debugger.
+
+Execute tests with `python3 -m pytest --pdb tests/`
+
+
+
+ 
