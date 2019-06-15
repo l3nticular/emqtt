@@ -1,3 +1,9 @@
+
+|  | Status |
+|-------|--------|
+| **Main** | [![Build Status](https://travis-ci.com/vfilby/emqtt.svg?branch=master)](https://travis-ci.com/vfilby/emqtt) |
+| **Beta** | [![Build Status](https://travis-ci.com/vfilby/emqtt.svg?branch=beta)](https://travis-ci.com/vfilby/emqtt) |
+
 # emqtt
 
 Receive emails and publish to MQTT. Super simple stuff. Topic will be `<configurable_prefix>/<sender_email.replace('@', '')>`.
@@ -11,6 +17,9 @@ It's based on aiosmtpd and paho-mqtt.
 I made a docker image because like any hipster dev I like docker. At least it's based on alpine so there's that.
 
 Protip: `docker exec emqtt find attachments -type f -ctime +20 -delete`
+
+
+
 
 ## Setup / Installation 
 
