@@ -38,10 +38,10 @@ if __name__ == '__main__':
 
     loop = asyncio.get_event_loop()
     c = Controller(
-        emqtt.EMQTTHandler(loop, config), 
-        loop, 
-        config['SMTP_LISTEN_ADDRESS'], 
-        config['SMTP_PORT']
+        handler=emqtt.EMQTTHandler(loop, config),
+        loop=loop,
+        hostname=config['SMTP_LISTEN_ADDRESS'],
+        port=config['SMTP_PORT']
     )
     
     c.start()
