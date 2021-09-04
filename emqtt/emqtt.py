@@ -3,6 +3,7 @@ import logging
 import email
 import os
 import time
+import re
 from datetime import datetime
 from email.policy import default
 from paho.mqtt import publish
@@ -44,6 +45,10 @@ class EMQTTHandler:
         # be used in tests
         if self.config['SAVE_RAW_MESSAGES']:
             msg_filename = email_message['subject']
+            # Remove all non-word characters (everything except numbers and letters)
+            msg_filename = re.sub(r"[^\w\s]", '_', msg_filename)
+            # Replace all runs of whitespace with a single dash
+            msg_filename = re.sub(r"\s+", '-', msg_filename)
             log.debug( "Saving message content: %s", msg_filename )
             file_path = os.path.join('messages', msg_filename)
             with open(file_path, 'w+') as f:
