@@ -26,6 +26,7 @@ class EMQTTHandler:
         signal.signal(signal.SIGINT, self.set_quit)
         if self.config['SAVE_ATTACHMENTS']:
             log.info('Configured to save attachments')
+        PluginManager().load_plugins()
 
 
     async def handle_DATA(self, server, session, envelope):
@@ -57,16 +58,17 @@ class EMQTTHandler:
         # Check the dynamic plugins
         actions = EmailProcessor.get_plugins()
         log.debug( "Loaded processor plugins: %s", actions )
-        mqtt_msg = None
+        mqtt_msgs = []
 
         plugin = PluginManager().get_plugin( email_message['from'] )
-        mqtt_msg = plugin.mqtt_message( email_message )
-            
-        self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
+        mqtt_msgs = plugin.mqtt_message( email_message )
+        for mqtt_msg in mqtt_msgs:
+            self.mqtt_publish( mqtt_msg.topic, mqtt_msg.payload )
+        mqtt_msg = mqtt_msgs[0] # TODO make the rest of the fn handle multiple msgs
 
         # Save attached files if configured to do so.
         if self.config['SAVE_ATTACHMENTS'] and (
-                # Don't save them during rese time unless configured to do so.
+                # Don't save them during reset time unless configured to do so.
                 mqtt_msg.topic not in self.handles
                 or self.config['SAVE_ATTACHMENTS_DURING_RESET_TIME']):
             log.debug(
@@ -92,17 +94,17 @@ class EMQTTHandler:
 
 
         # Cancel any current scheduled resets of this topic
-        if mqtt_msg.topic in self.handles:
-            self.handles.pop(mqtt_msg.topic).cancel()
-
-        if self.reset_time:
-            # Schedule a reset of this topic
-            log.debug( "Sheduling reset in %ds for %s", self.reset_time, mqtt_msg.topic )
-            self.handles[mqtt_msg.topic] = self.loop.call_later(
-                self.reset_time,
-                self.reset,
-                mqtt_msg.topic
-            )
+        for mqtt_msg in mqtt_msgs:
+            if mqtt_msg.topic in self.handles:
+                self.handles.pop(mqtt_msg.topic).cancel()
+            if self.reset_time:
+                # Schedule a reset of this topic
+                log.debug( "Sheduling reset in %ds for %s", self.reset_time, mqtt_msg.topic )
+                self.handles[mqtt_msg.topic] = self.loop.call_later(
+                    self.reset_time,
+                    self.reset,
+                    mqtt_msg.topic
+                )
         return '250 Message accepted for delivery'
 
     def mqtt_publish(self, topic, payload):

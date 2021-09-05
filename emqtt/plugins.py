@@ -60,7 +60,7 @@ class EmailProcessor(metaclass=PluginMount):
           response.topic, 
           address.replace('@', '')
         )
-        return response
+        return [ response ]
         
     def attachment_hook( self, email_message ):
         return
